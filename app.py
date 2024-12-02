@@ -6,6 +6,7 @@ import sys  # Importer sys pour quitter le programme
 # from CaptureEtAffichePhoto import PhotoBoothApp
 from recognition_page import FaceRecognition
 from home import HomePage
+
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -42,6 +43,7 @@ class App(tk.Tk):
         else:
             messagebox.showerror("Erreur", f"La page '{page_name}' n'existe pas.")
 
+# Exemple d'utilisation
 if __name__ == "__main__":
     app = App()
     app.mainloop()
