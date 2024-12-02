@@ -87,12 +87,137 @@ class FaceRecognition(tk.Frame):
         self.back_button.pack()
 
     def load_known_faces(self):
-        # Implémentez la logique pour charger les visages connus
-        pass
+        known_faces_folder = "data"
+        valid_extensions = [".jpg", ".jpeg", ".png", ".bmp", ".tiff"]
+
+        if not os.path.exists(known_faces_folder):
+            messagebox.showerror("Erreur", f"Le dossier '{known_faces_folder}' n'existe pas.")
+            return
+        
+        known_image_paths = [os.path.join(known_faces_folder, img) for img in os.listdir(known_faces_folder) if any(img.lower().endswith(ext) for ext in valid_extensions)]
+
+        if not known_image_paths:
+            messagebox.showwarning("Avertissement", "Aucune image trouvée dans le dossier 'data'.")
+            return
+
+        for image_path in known_image_paths:
+            image = face_recognition.load_image_file(image_path)
+            encodings = face_recognition.face_encodings(image)
+
+            if encodings:
+                encoding = encodings[0]
+                name = os.path.splitext(os.path.basename(image_path))[0]
+
+                # Exemple d'informations supplémentaires (vous pouvez les adapter selon vos besoins)
+                info = {
+                    "prenom": "Prénom_" + name,
+                    "numero_detenu": "Numéro_" + name,
+                    "nom": name.capitalize()
+                }
+                self.face_info[name] = info  # Stocker les informations dans le dictionnaire
+
+                self.known_face_encodings.append(encoding)
+                self.known_face_names.append(name)
+            else:
+                messagebox.showwarning("Avertissement", f"Aucun visage détecté dans l'image '{image_path}'.")
 
     def update_frame(self):
-        # Implémentez la logique pour mettre à jour les frames de la vidéo
-        pass
+        if not self.is_running:
+            return
+
+        ret, frame = self.cap.read()
+        
+        if not ret:
+            messagebox.showerror("Erreur", "Impossible de lire le flux vidéo.")
+            return
+
+        # Redimensionner le cadre pour accélérer le traitement
+        small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+        
+        # Convertir l'image de BGR à RGB
+        rgb_small_frame = small_frame[:, :, ::-1]
+
+        if self.process_this_frame:
+            # Trouver toutes les positions de visages et les encodages dans le cadre actuel
+            self.face_locations = face_recognition.face_locations(rgb_small_frame, model="hog")
+            self.face_encodings = face_recognition.face_encodings(rgb_small_frame, self.face_locations)
+
+            # Réinitialiser les noms des visages pour ce cadre
+            self.face_names = []
+
+            for face_encoding in self.face_encodings:
+                matches = face_recognition.compare_faces(self.known_face_encodings, face_encoding)
+                name = "Inconnu"
+
+                # Utiliser le visage connu avec la plus petite distance par rapport au nouveau visage
+                face_distances = face_recognition.face_distance(self.known_face_encodings, face_encoding)
+                best_match_index = np.argmin(face_distances)
+                if matches[best_match_index]:
+                    name = self.known_face_names[best_match_index]
+
+                self.face_names.append(name)
+
+            # Mettre à jour l'affichage du visage reconnu et les informations
+            recognized_name = None
+            for name in self.face_names:
+                if name != "Inconnu":
+                    recognized_name = name
+                    break
+            
+            if recognized_name:
+                # Vérifiez chaque extension pour les images reconnues
+                image_path = None
+                for ext in [".jpg", ".jpeg", ".png", ".bmp", ".tiff"]:
+                    candidate_path = os.path.join("data", recognized_name + ext)
+                    if os.path.exists(candidate_path):
+                        image_path = candidate_path
+                        break
+
+                if image_path:
+                    img = Image.open(image_path)
+                    img.thumbnail((400, 400))  # Redimensionner l'image pour l'affichage
+                    img_tk = ImageTk.PhotoImage(img)
+                    self.recognized_face_label.config(image=img_tk)
+                    self.recognized_face_label.image = img_tk  # Garder une référence à l'image
+
+                    # Afficher les informations sous la photo reconnue
+                    info = self.face_info.get(recognized_name, {})
+                    display_info = f"Nom: {info.get('nom', 'Inconnu')}\nPrénom: {info.get('prenom', 'Inconnu')}\nNuméro de détenu: {info.get('numero_detenu', 'Inconnu')}"
+                    self.recognized_face_info_label.config(text=display_info)
+
+                    # Jouer un son d'alarme si le nom est "JOSUE" 
+                    if recognized_name.upper() == "JOSUE":
+                        playsound(os.path.abspath('audios/zombi.mp3'))
+                        
+                else:
+                    self.recognized_face_label.config(image='')
+                    self.recognized_face_label.image = None
+                    self.recognized_face_info_label.config(text="")
+
+            else:
+                # Si aucune personne reconnue, effacer l'image affichée et afficher "Inconnu"
+                self.recognized_face_label.config(image='')
+                self.recognized_face_label.image = None
+                self.recognized_face_info_label.config(text="Inconnu")
+
+           
+            # Dessiner des rectangles autour des visages reconnus avec des couleurs différentes
+            for (top, right, bottom, left), name in zip(self.face_locations, self.face_names):
+                color = (0, 255, 0) if name != "Inconnu" else (255, 0, 0)  # Vert pour reconnu, rouge pour inconnu
+                cv2.rectangle(frame, (left * 4, top * 4), (right * 4, bottom * 4), color, 2)
+                cv2.putText(frame, name, (left * 4 + 6, top * 4 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.75, color, 2)
+
+        # Afficher l'image résultante dans le canvas
+        cv2image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        img = Image.fromarray(cv2image)
+        imgtk = ImageTk.PhotoImage(image=img)
+        self.canvas_camera.create_image(0, 0, anchor=tk.NW, image=imgtk)
+        self.canvas_camera.imgtk = imgtk
+
+        # Traiter le prochain cadre
+        self.process_this_frame = not self.process_this_frame
+        self.after(10, self.update_frame)
+
 
     def on_closing(self):
         self.is_running = False
