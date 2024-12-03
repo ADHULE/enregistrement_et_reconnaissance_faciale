@@ -46,7 +46,7 @@ class FaceRecognition(tk.Frame):
 
     def setup_gui(self):
         # Titre
-        self.label_title = tk.Label(self, text="Application de Reconnaissance Faciale", font=("Arial", 30, "bold"), bg="#3e4149", fg="#ffcc00")
+        self.label_title = tk.Label(self, text="RECONNAISSANCE", font=("Arial", 30, "bold"), bg="#3e4149", fg="#ffcc00")
         self.label_title.pack(pady=20)
 
         # Cadre principal pour organiser tous les éléments
@@ -87,6 +87,7 @@ class FaceRecognition(tk.Frame):
         self.back_button.pack()
 
     def load_known_faces(self):
+        # Dossier contenant les images des visages connus
         known_faces_folder = "data"
         valid_extensions = [".jpg", ".jpeg", ".png", ".bmp", ".tiff"]
 
@@ -94,6 +95,7 @@ class FaceRecognition(tk.Frame):
             messagebox.showerror("Erreur", f"Le dossier '{known_faces_folder}' n'existe pas.")
             return
         
+        # Liste des chemins d'images valides dans le dossier
         known_image_paths = [os.path.join(known_faces_folder, img) for img in os.listdir(known_faces_folder) if any(img.lower().endswith(ext) for ext in valid_extensions)]
 
         if not known_image_paths:
@@ -108,7 +110,7 @@ class FaceRecognition(tk.Frame):
                 encoding = encodings[0]
                 name = os.path.splitext(os.path.basename(image_path))[0]
 
-                # Exemple d'informations supplémentaires (vous pouvez les adapter selon vos besoins)
+                # Exemple d'informations supplémentaires
                 info = {
                     "prenom": "Prénom_" + name,
                     "numero_detenu": "Numéro_" + name,
@@ -139,7 +141,7 @@ class FaceRecognition(tk.Frame):
 
         if self.process_this_frame:
             # Trouver toutes les positions de visages et les encodages dans le cadre actuel
-            self.face_locations = face_recognition.face_locations(rgb_small_frame, model="hog")
+            self.face_locations = face_recognition.face_locations(rgb_small_frame, model="cnn")  # Utiliser un modèle CNN
             self.face_encodings = face_recognition.face_encodings(rgb_small_frame, self.face_locations)
 
             # Réinitialiser les noms des visages pour ce cadre
@@ -152,7 +154,7 @@ class FaceRecognition(tk.Frame):
                 # Utiliser le visage connu avec la plus petite distance par rapport au nouveau visage
                 face_distances = face_recognition.face_distance(self.known_face_encodings, face_encoding)
                 best_match_index = np.argmin(face_distances)
-                if matches[best_match_index]:
+                if matches[best_match_index] and face_distances[best_match_index] < 0.5:  # Utiliser un seuil de confiance plus strict
                     name = self.known_face_names[best_match_index]
 
                 self.face_names.append(name)
@@ -185,7 +187,7 @@ class FaceRecognition(tk.Frame):
                     display_info = f"Nom: {info.get('nom', 'Inconnu')}\nPrénom: {info.get('prenom', 'Inconnu')}\nNuméro de détenu: {info.get('numero_detenu', 'Inconnu')}"
                     self.recognized_face_info_label.config(text=display_info)
 
-                    # Jouer un son d'alarme si le nom est "JOSUE" 
+                    # Jouer un son d'alarme si le nom est "JOSUE"
                     if recognized_name.upper() == "JOSUE":
                         playsound(os.path.abspath('audios/zombi.mp3'))
                         
@@ -194,13 +196,13 @@ class FaceRecognition(tk.Frame):
                     self.recognized_face_label.image = None
                     self.recognized_face_info_label.config(text="")
 
+          
+             # Si aucune personne reconnue, effacer l'image affichée et afficher "Inconnu"
             else:
-                # Si aucune personne reconnue, effacer l'image affichée et afficher "Inconnu"
                 self.recognized_face_label.config(image='')
                 self.recognized_face_label.image = None
                 self.recognized_face_info_label.config(text="Inconnu")
 
-           
             # Dessiner des rectangles autour des visages reconnus avec des couleurs différentes
             for (top, right, bottom, left), name in zip(self.face_locations, self.face_names):
                 color = (0, 255, 0) if name != "Inconnu" else (255, 0, 0)  # Vert pour reconnu, rouge pour inconnu
@@ -218,7 +220,6 @@ class FaceRecognition(tk.Frame):
         self.process_this_frame = not self.process_this_frame
         self.after(10, self.update_frame)
 
-
     def on_closing(self):
         self.is_running = False
         self.cap.release()
@@ -228,6 +229,6 @@ class FaceRecognition(tk.Frame):
 if __name__ == "__main__":
     root = tk.Tk()
     root.geometry("800x600")
-    app = FaceRecognition(root, root)  # Remplacez None par votre contrôleur réel si nécessaire
+    app = FaceRecognition(root, root)  # Remplacez root par votre contrôleur réel si nécessaire
     app.pack(fill=tk.BOTH, expand=True)
     root.mainloop()

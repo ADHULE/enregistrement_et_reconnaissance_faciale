@@ -12,7 +12,7 @@ class PhotoBoothApp(tk.Frame):
         self.parent = parent
 
         # Titre de l'application
-        self.label_title = tk.Label(self, text="Application de Photo Booth", font=("Arial", 24, "bold"), bg="#2c3e50", fg="#ecf0f1")
+        self.label_title = tk.Label(self, text="ENREGISTREMENT", font=("Arial", 24, "bold"), bg="#2c3e50", fg="#ecf0f1")
         self.label_title.pack(pady=20)
 
         # Cadre principal pour organiser les éléments
